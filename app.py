@@ -4,6 +4,7 @@ import uuid
 import logging
 import threading
 import subprocess
+import json
 from datetime import datetime, timedelta
 from typing import Dict, Any
 
@@ -13,6 +14,7 @@ from flask import Flask, request, render_template, send_file, jsonify
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, "downloads")
 TEMPLATES_FOLDER = os.path.join(BASE_DIR, "templates")
+DOWNLOAD_LOG_FILE = os.path.join(BASE_DIR, "download_logs.json")
 
 MAX_FILE_SIZE = "500M"
 CLEANUP_INTERVAL_HOURS = 24
@@ -107,6 +109,20 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
             "error": str(e),
             "completed_at": datetime.now()
         }
+def log_download(title: str, filename: str, ip: str):
+    log_data = {}
+    if os.path.exists(DOWNLOAD_LOG_FILE):
+        with open(DOWNLOAD_LOG_FILE, "r") as f:
+            try:
+                log_data = json.load(f)
+            except:
+                log_data = {}
+
+    log_data[filename] = log_data.get(filename, 0) + 1
+    with open(DOWNLOAD_LOG_FILE, "w") as f:
+        json.dump(log_data, f, indent=2)
+
+    logger.info(f"Download logged: {filename} by {ip}")
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -158,6 +174,20 @@ def download_file(filename: str):
         return "File not found", 404
 
     return send_file(path, as_attachment=True)
+
+@app.route("/download/<filename>")
+def download_file(filename: str):
+    ...
+    log_download(title=filename, filename=filename, ip=request.remote_addr)
+    return send_file(path, as_attachment=True)
+
+@app.route("/analytics", methods=["GET"])
+def analytics():
+    if not os.path.exists(DOWNLOAD_LOG_FILE):
+        return jsonify({})
+    with open(DOWNLOAD_LOG_FILE, "r") as f:
+        data = json.load(f)
+    return jsonify(data)
 
 # ─── Error Handlers ───────────────────────────────────────────────────────────
 
