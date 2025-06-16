@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Video Downloader</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="logo-row">
+      <div class="yt-icon">
+        <svg width="115" height="80" viewBox="0 0 115 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g>
+          <path d="M111.769 12.8368C110.46 7.97826 106.614 4.16016 101.722 2.8596C92.8628 0.500001 57.3226 0.5 57.3226 0.5C57.3226 0.5 21.7828 0.500001 12.9235 2.8596C8.03085 4.16016 4.1859 7.97826 2.87619 12.8368C0.500001 21.6342 0.5 40 0.5 40C0.5 40 0.500001 58.3659 2.87619 67.1634C4.1859 72.0219 8.03085 75.8399 12.9235 77.1403C21.7828 79.5 57.3226 79.5 57.3226 79.5C57.3226 79.5 92.8628 79.5 101.722 77.1403C106.614 75.8399 110.46 72.0219 111.769 67.1634C114.146 58.3659 114.146 40 114.146 40C114.146 40 114.136 21.6342 111.769 12.8368Z" fill="#FF0000"/>
+          </g>
+          <path fill-rule="evenodd" clip-rule="evenodd" d="M51.5899 20.4904C51.2503 21.1704 51.2503 22.0629 51.2503 23.85V37.875H48.7566C46.917 37.875 45.9962 37.875 45.5607 38.249C45.3739 38.4092 45.2265 38.6118 45.1302 38.8406C45.034 39.0694 44.9916 39.318 45.0066 39.5665C45.042 40.1487 45.6774 40.8266 46.9462 42.1845L55.692 51.5366C56.3212 52.2124 56.6357 52.5481 57.0045 52.6735C57.3263 52.7835 57.6744 52.7835 57.9962 52.6735C58.3649 52.5481 58.6795 52.2124 59.3087 51.5366L68.0545 42.1866C69.3253 40.8266 69.9587 40.1466 69.992 39.5665C70.0072 39.3182 69.9652 39.0697 69.8693 38.8409C69.7734 38.6121 69.6264 38.4094 69.4399 38.249C69.0045 37.875 68.0857 37.875 66.2441 37.875H63.7503V23.85C63.7503 22.065 63.7503 21.1725 63.4087 20.4904C63.1095 19.8904 62.6318 19.4024 62.0441 19.0964C61.3774 18.75 60.5024 18.75 58.7503 18.75H56.2503C54.5003 18.75 53.6253 18.75 52.9566 19.0964C52.368 19.4021 51.8896 19.8901 51.5899 20.4904ZM42.917 59.125C42.917 59.6886 43.1365 60.2291 43.5272 60.6276C43.9179 61.0261 44.4478 61.25 45.0003 61.25H70.0003C70.5529 61.25 71.0828 61.0261 71.4735 60.6276C71.8642 60.2291 72.0837 59.6886 72.0837 59.125C72.0837 58.5614 71.8642 58.0209 71.4735 57.6224C71.0828 57.2239 70.5529 57 70.0003 57H45.0003C44.4478 57 43.9179 57.2239 43.5272 57.6224C43.1365 58.0209 42.917 58.5614 42.917 59.125Z" fill="white"/>
+          </svg>          
+      </div>
+      <span class="title">VIDEO DOWNLOADER</span>
+    </div>
+    <form 
+      onsubmit="event.preventDefault(); startDownload();" 
+      style="width:100%;display:flex;flex-direction:column;align-items:center;">
+      <div class="search-row">
+        <input 
+          id="url" 
+          name="url" 
+          type="text" 
+          class="search-input" 
+          placeholder="Paste video link..." 
+          onkeydown="handleSearchKey(event)" required
+          >
+        <button 
+          type="button"
+          class="search-btn" 
+          onclick="startDownload()">
+          <svg 
+            viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" stroke="#fff" stroke-width="2" fill="none"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65" stroke="#fff" stroke-width="2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="format-row">
+        <label><input type="radio" name="format" value="mp4" checked> MP4</label>
+        <label><input type="radio" name="format" value="mp3"> MP3</label>
+      </div>
+      <button type="submit" class="download-btn">Download</button>
+      <div class="progress-container" id="progressContainer" style="display: none;">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+    </form>
+    <p id="status"></p>
+  </div>
+</body>
+</html>
