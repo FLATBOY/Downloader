@@ -172,12 +172,7 @@ def download_file(filename: str):
     path = os.path.join(DOWNLOAD_FOLDER, filename)
     if not os.path.isfile(path):
         return "File not found", 404
-
-    return send_file(path, as_attachment=True)
-
-@app.route("/download/<filename>")
-def download_file(filename: str):
-    ...
+    
     log_download(title=filename, filename=filename, ip=request.remote_addr)
     return send_file(path, as_attachment=True)
 
