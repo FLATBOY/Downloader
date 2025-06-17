@@ -101,3 +101,20 @@ function handleSearchKey(e) {
     startDownload();
   }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  const urlInput = document.getElementById("url");
+  const downloadBtn = document.querySelector(".download-btn");
+
+  function toggleDownloadButton() {
+    if (urlInput.value.trim() === "") {
+      downloadBtn.style.display = "none";
+    } else {
+      downloadBtn.style.display = "inline-block";
+    }
+  }
+
+  // Initial check + listener
+  toggleDownloadButton();
+  urlInput.addEventListener("input", toggleDownloadButton);
+});
