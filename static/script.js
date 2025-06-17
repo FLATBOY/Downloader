@@ -73,8 +73,7 @@ async function checkStatus(file_id) {
       clearInterval(progressInterval);
       document.getElementById("progressBar").style.width = "100%";
       statusText.innerHTML = `
-        ✅ Download ready: <br>
-        <a class="download-link" href="/download/${data.file}" download>Click here to download</a>`;
+        <a class="download-btn" style="text-decoration:none;" href="/download/${data.file}" download>Download video</a>`;
     } else if (data.status === "error") {
       stopDotAnimation();
       clearInterval(progressInterval);
