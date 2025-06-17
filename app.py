@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any
 
 from flask import Flask, request, render_template, send_file, jsonify
+from tracking import log_download_to_db  # Your PostgreSQL logger
 
 # ─── Configuration ─────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,10 +21,12 @@ MAX_FILE_SIZE = "500M"
 CLEANUP_INTERVAL_HOURS = 24
 SUPPORTED_FORMATS = ["mp4", "mp3"]
 
-# ─── Flask App ────────────────────────────────────────────────────────────────
+# ─── App Setup ─────────────────────────────────────────────────────────────────
 app = Flask(__name__, template_folder=TEMPLATES_FOLDER)
+user_sessions: Dict[str, datetime] = {}
+download_status: Dict[str, Any] = {}
 
-# ─── Logging ──────────────────────────────────────────────────────────────────
+# ─── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -31,23 +34,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ─── Setup Downloads Folder ───────────────────────────────────────────────────
+# ─── Setup Downloads Folder ────────────────────────────────────────────────────
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# ─── Cookies File from Env ─────────────────────────────────────────────────────
+# ─── Cookies ───────────────────────────────────────────────────────────────────
 cookies_env = os.getenv("COOKIES_CONTENT")
 cookies_path = os.path.join(BASE_DIR, "cookies.txt")
-
 if cookies_env and not os.path.exists(cookies_path):
     with open(cookies_path, "w") as f:
         f.write(cookies_env)
-
 COOKIES_FILE = cookies_path
 
-# ─── Global Status Store ───────────────────────────────────────────────────────
-download_status: Dict[str, Any] = {}
-
-# ─── Utils ─────────────────────────────────────────────────────────────────────
+# ─── Utilities ─────────────────────────────────────────────────────────────────
 
 def validate_url(url: str) -> bool:
     return isinstance(url, str) and url.startswith(('http://', 'https://'))
@@ -62,7 +60,22 @@ def cleanup_old_files() -> None:
             os.remove(file_path)
             logger.info(f"Cleaned old file: {file_path}")
 
-# ─── Download Worker ──────────────────────────────────────────────────────────
+def log_download(title: str, filename: str, ip: str):
+    log_data = {}
+    if os.path.exists(DOWNLOAD_LOG_FILE):
+        with open(DOWNLOAD_LOG_FILE, "r") as f:
+            try:
+                log_data = json.load(f)
+            except:
+                log_data = {}
+
+    log_data[filename] = log_data.get(filename, 0) + 1
+    with open(DOWNLOAD_LOG_FILE, "w") as f:
+        json.dump(log_data, f, indent=2)
+
+    logger.info(f"Local JSON log: {filename} by {ip}")
+
+# ─── Download Logic ────────────────────────────────────────────────────────────
 
 def run_download(url: str, format_type: str, file_id: str) -> None:
     try:
@@ -70,8 +83,7 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
         output_template = os.path.join(DOWNLOAD_FOLDER, "%(title).200s.%(ext)s")
 
         base_cmd = [
-            "yt-dlp",
-            "--cookies", COOKIES_FILE,
+            "yt-dlp", "--cookies", COOKIES_FILE,
             "--max-filesize", MAX_FILE_SIZE,
             "-o", output_template
         ]
@@ -109,20 +121,6 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
             "error": str(e),
             "completed_at": datetime.now()
         }
-def log_download(title: str, filename: str, ip: str):
-    log_data = {}
-    if os.path.exists(DOWNLOAD_LOG_FILE):
-        with open(DOWNLOAD_LOG_FILE, "r") as f:
-            try:
-                log_data = json.load(f)
-            except:
-                log_data = {}
-
-    log_data[filename] = log_data.get(filename, 0) + 1
-    with open(DOWNLOAD_LOG_FILE, "w") as f:
-        json.dump(log_data, f, indent=2)
-
-    logger.info(f"Download logged: {filename} by {ip}")
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -141,6 +139,7 @@ def start_download():
         return jsonify({"error": "Unsupported format"}), 400
 
     file_id = str(uuid.uuid4())
+    user_sessions[file_id] = datetime.now()
     cleanup_old_files()
 
     threading.Thread(
@@ -149,7 +148,7 @@ def start_download():
         daemon=True
     ).start()
 
-    return jsonify({"file_id": file_id}), 200
+    return jsonify({"file_id": file_id})
 
 @app.route("/status/<file_id>")
 def status(file_id: str):
@@ -158,10 +157,26 @@ def status(file_id: str):
         return jsonify({"status": "unknown"}), 404
 
     resp = {"status": status["status"]}
-    if "file" in status:
-        resp["file"] = status["file"]
+
+    if status["status"] == "done":
+        filename = status.get("file")
+        started = user_sessions.pop(file_id, datetime.now())
+        finished = status.get("completed_at", datetime.now())
+        format_type = "mp4" if filename.endswith(".mp4") else "mp3"
+
+        log_download_to_db(
+            ip=request.remote_addr,
+            fmt=format_type,
+            filename=filename,
+            started_at=started,
+            finished_at=finished
+        )
+        log_download(title=filename, filename=filename, ip=request.remote_addr)
+        resp["file"] = filename
+
     if "error" in status:
         resp["error"] = status["error"]
+
     return jsonify(resp)
 
 @app.route("/download/<filename>")
@@ -172,8 +187,7 @@ def download_file(filename: str):
     path = os.path.join(DOWNLOAD_FOLDER, filename)
     if not os.path.isfile(path):
         return "File not found", 404
-    
-    log_download(title=filename, filename=filename, ip=request.remote_addr)
+
     return send_file(path, as_attachment=True)
 
 @app.route("/analytics", methods=["GET"])
@@ -181,8 +195,7 @@ def analytics():
     if not os.path.exists(DOWNLOAD_LOG_FILE):
         return jsonify({})
     with open(DOWNLOAD_LOG_FILE, "r") as f:
-        data = json.load(f)
-    return jsonify(data)
+        return jsonify(json.load(f))
 
 # ─── Error Handlers ───────────────────────────────────────────────────────────
 
@@ -195,7 +208,7 @@ def server_error(e):
     logger.error(f"Internal error: {e}")
     return jsonify({"error": "Internal server error"}), 500
 
-# ─── Entry ────────────────────────────────────────────────────────────────────
+# ─── Main ─────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     logger.info("🚀 Starting Flask Video Downloader")
