@@ -1,6 +1,8 @@
 Flask
 yt-dlp
 gunicorn
-psycopg2
+psycopg2-binary
 requests
+python-dotenv
+
 #boto3 for AWS S3

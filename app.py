@@ -85,15 +85,25 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
         base_cmd = [
             "yt-dlp", "--cookies", COOKIES_FILE,
             "--max-filesize", MAX_FILE_SIZE,
+            "--no-playlist",
             "-o", output_template
         ]
+        # Detect Youtube URL
+        isYoutube = "youtube.com" in url or "youtu.be" in url
 
         if format_type == "mp4":
-            cmd = base_cmd + [
-                "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]",
-                "--merge-output-format", "mp4",
-                url
-            ]
+            if isYoutube:
+                cmd = base_cmd + [
+                    "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]",
+                    "--merge-output-format", "mp4",
+                    url
+                ]
+            else:
+                cmd = base_cmd + [
+                    "-f", "bestvideo+bestaudio/best",
+                    "--merge-output-format", "mp4",
+                    url
+                ]
         elif format_type == "mp3":
             cmd = base_cmd + ["-x", "--audio-format", "mp3", url]
         else:
