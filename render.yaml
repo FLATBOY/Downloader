@@ -1,9 +1,8 @@
 services:
   - type: web
     name: video-downloader
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
-    autoDeploy: true
-    region: oregon  # or frankfurt, singapore, etc.
+    env: docker
     plan: free
+    region: oregon
+    autoDeploy: true
+    startCommand: gunicorn app:app
