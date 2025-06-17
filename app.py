@@ -111,7 +111,7 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
         files = sorted(glob.glob(os.path.join(DOWNLOAD_FOLDER, f"{file_id}-*.*")), key=os.path.getmtime, reverse=True)
         if files:
             file_name = os.path.basename(files[0])
-            download_status[file_id]["file"] = {
+            download_status[file_id] = {
                 "status": "done",
                 "file": file_name,
                 "completed_at": datetime.now()
