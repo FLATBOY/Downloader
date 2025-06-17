@@ -81,7 +81,7 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
         logger.info(f"Starting download {file_id}: {url} as {format_type}")
         user_sessions[file_id] = datetime.now()
 
-        output_template = os.path.join(DOWNLOAD_FOLDER, "%(title).200s.%(ext)s")
+        output_template = os.path.join(DOWNLOAD_FOLDER, f"{file_id}-%(title).200s.%(ext)s")
 
         base_cmd = [
             "yt-dlp", "--cookies", COOKIES_FILE,
@@ -108,10 +108,10 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         logger.info(f"yt-dlp output: {result.stdout}")
 
-        files = sorted(glob.glob(os.path.join(DOWNLOAD_FOLDER, "*.*")), key=os.path.getmtime, reverse=True)
+        files = sorted(glob.glob(os.path.join(DOWNLOAD_FOLDER, f"{file_id}-*.*")), key=os.path.getmtime, reverse=True)
         if files:
             file_name = os.path.basename(files[0])
-            download_status[file_id] = {
+            download_status[file_id]["file"] = {
                 "status": "done",
                 "file": file_name,
                 "completed_at": datetime.now()
@@ -195,12 +195,12 @@ def download_file(filename: str):
 
     return send_file(path, as_attachment=True)
 
-@app.route("/analytics", methods=["GET"])
-def analytics():
-    if not os.path.exists(DOWNLOAD_LOG_FILE):
-        return jsonify({})
-    with open(DOWNLOAD_LOG_FILE, "r") as f:
-        return jsonify(json.load(f))
+# @app.route("/analytics", methods=["GET"])
+# def analytics():
+#     if not os.path.exists(DOWNLOAD_LOG_FILE):
+#         return jsonify({})
+#     with open(DOWNLOAD_LOG_FILE, "r") as f:
+#         return jsonify(json.load(f))
 
 # ─── Error Handlers ───────────────────────────────────────────────────────────
 
