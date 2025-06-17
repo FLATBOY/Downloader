@@ -26,6 +26,7 @@ user_sessions: Dict[str, datetime] = {}
 download_status: Dict[str, Any] = {}
 short_id = uuid.uuid4().hex[:8]
 
+
 # ─── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
@@ -82,7 +83,7 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
         logger.info(f"Starting download {file_id}: {url} as {format_type}")
         user_sessions[file_id] = datetime.now()
 
-        output_template = os.path.join(DOWNLOAD_FOLDER, f"%(title).200s-{short_id}.%(ext)s")
+        output_template = os.path.join(DOWNLOAD_FOLDER, f"{short_id}-%(title).200s.%(ext)s")
 
         base_cmd = [
             "yt-dlp", "--cookies", COOKIES_FILE,
@@ -109,7 +110,7 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         logger.info(f"yt-dlp output: {result.stdout}")
 
-        files = sorted(glob.glob(os.path.join(DOWNLOAD_FOLDER, f"*{short_id}*")), key=os.path.getmtime, reverse=True)
+        files = sorted(glob.glob(os.path.join(DOWNLOAD_FOLDER, f"{short_id}-*.*")), key=os.path.getmtime, reverse=True)
         if files:
             file_name = os.path.basename(files[0])
             download_status[file_id] = {
