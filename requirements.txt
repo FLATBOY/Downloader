@@ -4,5 +4,6 @@ gunicorn
 psycopg2-binary
 requests
 python-dotenv
+redis
 
 #boto3 for AWS S3
