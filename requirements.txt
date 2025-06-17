@@ -1,4 +1,5 @@
 Flask
 yt-dlp
 gunicorn
+psycopg2
 #boto3 for AWS S3
