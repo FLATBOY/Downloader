@@ -24,8 +24,6 @@ SUPPORTED_FORMATS = ["mp4", "mp3"]
 app = Flask(__name__, template_folder=TEMPLATES_FOLDER)
 user_sessions: Dict[str, datetime] = {}
 download_status: Dict[str, Any] = {}
-short_id = uuid.uuid4().hex[:8]
-
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -80,6 +78,7 @@ def log_download(title: str, filename: str, ip: str):
 
 def run_download(url: str, format_type: str, file_id: str) -> None:
     try:
+        short_id = uuid.uuid4().hex[:8]
         logger.info(f"Starting download {file_id}: {url} as {format_type}")
         user_sessions[file_id] = datetime.now()
 
