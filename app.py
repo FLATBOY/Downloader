@@ -63,11 +63,11 @@ def cleanup_old_files() -> None:
 def log_download(title: str, filename: str, ip: str):
     log_data = {}
     if os.path.exists(DOWNLOAD_LOG_FILE):
-        with open(DOWNLOAD_LOG_FILE, "r") as f:
-            try:
+        try:
+            with open(DOWNLOAD_LOG_FILE, "r") as f:
                 log_data = json.load(f)
-            except:
-                log_data = {}
+        except:
+            log_data = {}
 
     log_data[filename] = log_data.get(filename, 0) + 1
     with open(DOWNLOAD_LOG_FILE, "w") as f:
@@ -80,6 +80,8 @@ def log_download(title: str, filename: str, ip: str):
 def run_download(url: str, format_type: str, file_id: str) -> None:
     try:
         logger.info(f"Starting download {file_id}: {url} as {format_type}")
+        user_sessions[file_id] = datetime.now()
+
         output_template = os.path.join(DOWNLOAD_FOLDER, "%(title).200s.%(ext)s")
 
         base_cmd = [
@@ -88,22 +90,16 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
             "--no-playlist",
             "-o", output_template
         ]
-        # Detect Youtube URL
-        isYoutube = "youtube.com" in url or "youtu.be" in url
+
+        is_youtube = "youtube.com" in url or "youtu.be" in url
 
         if format_type == "mp4":
-            if isYoutube:
-                cmd = base_cmd + [
-                    "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]",
-                    "--merge-output-format", "mp4",
-                    url
-                ]
-            else:
-                cmd = base_cmd + [
-                    "-f", "bestvideo+bestaudio/best",
-                    "--merge-output-format", "mp4",
-                    url
-                ]
+            cmd = base_cmd + [
+                "-f",
+                "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]" if is_youtube else "bestvideo+bestaudio/best",
+                "--merge-output-format", "mp4",
+                url
+            ]
         elif format_type == "mp3":
             cmd = base_cmd + ["-x", "--audio-format", "mp3", url]
         else:
@@ -149,7 +145,6 @@ def start_download():
         return jsonify({"error": "Unsupported format"}), 400
 
     file_id = str(uuid.uuid4())
-    user_sessions[file_id] = datetime.now()
     cleanup_old_files()
 
     threading.Thread(
@@ -174,6 +169,7 @@ def status(file_id: str):
         finished = status.get("completed_at", datetime.now())
         format_type = "mp4" if filename.endswith(".mp4") else "mp3"
 
+        # Logging
         log_download_to_db(
             ip=request.remote_addr,
             fmt=format_type,
