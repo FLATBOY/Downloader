@@ -107,7 +107,8 @@ body {
     margin-top: 16px;
     padding: 14px 48px;
     font-size: 1.1rem;
-    background: #333;
+    font-weight: 700;
+    background: #205BF3;
     color: #fff;
     border: 1px solid #fff;
     border-radius: 30px;
@@ -115,7 +116,8 @@ body {
     transition: background 0.2s, box-shadow 0.2s;
   }
   .download-btn:hover, .download-btn:focus {
-    background: #444;
+    background: #478DF5;
+    font-weight: 700;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
   }
   /* Status & Download Link */
@@ -126,7 +128,7 @@ body {
     text-align: center;
   }
   a.download-link {
-    color: #0cf;
+    color: #;
     text-decoration: underline;
     font-weight: 500;
     transition: color 0.2s;

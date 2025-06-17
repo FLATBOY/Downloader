@@ -73,12 +73,16 @@ async function checkStatus(file_id) {
       clearInterval(progressInterval);
       document.getElementById("progressBar").style.width = "100%";
       statusText.innerHTML = `
+        <br>
         <a class="download-btn" style="text-decoration:none;" href="/download/${data.file}" download>Download video</a>`;
+      progressContainer.style.display = "none";
+      stopDotAnimation();
     } else if (data.status === "error") {
       stopDotAnimation();
       clearInterval(progressInterval);
       progressContainer.style.display = "none";
       statusText.innerText = "❌ Download failed.";
+      progressContainer.style.display = "none";
     } else {
       setTimeout(() => checkStatus(file_id), 1500);
     }
@@ -87,6 +91,7 @@ async function checkStatus(file_id) {
     clearInterval(progressInterval);
     progressContainer.style.display = "none";
     statusText.innerText = "⚠️ Error checking status.";
+    progressContainer.style.display = "none";
   }
 }
 
