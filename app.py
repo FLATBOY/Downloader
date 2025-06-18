@@ -16,7 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, "downloads")
 TEMPLATES_FOLDER = os.path.join(BASE_DIR, "templates")
 DOWNLOAD_LOG_FILE = os.path.join(BASE_DIR, "download_logs.json")
-MAX_FILE_SIZE = "500M"
+MAX_FILE_SIZE = "1024M"
 CLEANUP_INTERVAL_HOURS = 24
 SUPPORTED_FORMATS = ["mp4", "mp3"]
 
