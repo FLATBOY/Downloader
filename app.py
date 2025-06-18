@@ -16,7 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DOWNLOAD_FOLDER = os.path.join(BASE_DIR, "downloads")
 TEMPLATES_FOLDER = os.path.join(BASE_DIR, "templates")
 DOWNLOAD_LOG_FILE = os.path.join(BASE_DIR, "download_logs.json")
-MAX_FILE_SIZE = "1024M"
+MAX_FILE_SIZE = "500M"
 CLEANUP_INTERVAL_HOURS = 24
 SUPPORTED_FORMATS = ["mp4", "mp3"]
 
@@ -119,7 +119,7 @@ def run_download(url: str, format_type: str, file_id: str):
         filename = os.path.basename(files[0])
         original_path = os.path.join(DOWNLOAD_FOLDER, filename)
 
-        if is_facebook:
+        if is_facebook and filename.endswith(".mp4"):
             # QuickTime fix
             converted_path = os.path.join(DOWNLOAD_FOLDER, f"{short_id}-converted.mp4")
             subprocess.run([
