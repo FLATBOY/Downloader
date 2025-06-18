@@ -24,7 +24,6 @@ SUPPORTED_FORMATS = ["mp4", "mp3"]
 # ─── App Setup ─────────────────────────────────────────────────────────────────
 app = Flask(__name__, template_folder=TEMPLATES_FOLDER)
 user_sessions: Dict[str, datetime] = {}
-download_status: Dict[str, Any] = {}
 
 # ─── Redis Setup ───────────────────────────────────────────────────────────────
 redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -110,32 +109,33 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
         else:
             raise ValueError("Unsupported format")
 
-        download_status[file_id] = {"status": "downloading", "started_at": datetime.now()}
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        # logger.info(f"yt-dlp output: {result.stdout}")
+        redis_client.set(f"status:{file_id}", json.dumps({"status": "downloading"}))
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
         logger.error(f"yt-dlp stdout: {result.stdout}")
         logger.error(f"yt-dlp stderr: {result.stderr}")
         result.check_returncode()
 
         files = sorted(glob.glob(os.path.join(DOWNLOAD_FOLDER, f"{short_id}-*.*")), key=os.path.getmtime, reverse=True)
-        if files:
-            file_name = os.path.basename(files[0])
-            download_status[file_id] = {
-                "status": "done",
-                "file": file_name,
-                "completed_at": datetime.now()
-            }
-        else:
+        if not files:
             raise FileNotFoundError("No file downloaded.")
+
+        file_name = os.path.basename(files[0])
+        status = {
+            "status": "done",
+            "file": file_name,
+            "completed_at": datetime.now().isoformat()
+        }
+        redis_client.set(f"status:{file_id}", json.dumps(status))
 
     except Exception as e:
         logger.error(f"Download error for {file_id}: {e}")
-        download_status[file_id] = {
+        error_status = {
             "status": "error",
             "error": str(e),
-            "completed_at": datetime.now()
+            "completed_at": datetime.now().isoformat()
         }
-        redis_client.set(f"status:{file_id}", json.dumps(download_status[file_id]))
+        redis_client.set(f"status:{file_id}", json.dumps(error_status))
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -166,38 +166,33 @@ def start_download():
 
 @app.route("/status/<file_id>")
 def status(file_id: str):
-    try:
-        data = redis_client.get(f"status:{file_id}")
-        if not data:
-            return jsonify({"status": "unknown"}), 404
+    data = redis_client.get(f"status:{file_id}")
+    if not data:
+        return jsonify({"status": "unknown"}), 404
 
-        status = json.loads(data)
-        resp = {"status": status["status"]}
+    status = json.loads(data)
+    resp = {"status": status.get("status")}
 
-        if status["status"] == "done":
-            filename = status.get("file")
-            started = user_sessions.pop(file_id, datetime.now())
-            finished = status.get("completed_at", datetime.now())
-            format_type = "mp4" if filename.endswith(".mp4") else "mp3"
+    if status["status"] == "done":
+        filename = status.get("file")
+        started = user_sessions.pop(file_id, datetime.now())
+        finished = datetime.fromisoformat(status.get("completed_at"))
+        format_type = "mp4" if filename.endswith(".mp4") else "mp3"
 
-            log_download_to_db(
-                ip=request.remote_addr,
-                fmt=format_type,
-                filename=filename,
-                started_at=started,
-                finished_at=finished
-            )
-            log_download(title=filename, filename=filename, ip=request.remote_addr)
-            resp["file"] = filename
+        log_download_to_db(
+            ip=request.remote_addr,
+            fmt=format_type,
+            filename=filename,
+            started_at=started,
+            finished_at=finished
+        )
+        log_download(title=filename, filename=filename, ip=request.remote_addr)
+        resp["file"] = filename
 
-        if "error" in status:
-            resp["error"] = status["error"]
+    if "error" in status:
+        resp["error"] = status["error"]
 
-        return jsonify(resp)
-
-    except Exception as e:
-        logger.error(f"Redis error: {e}")
-        return jsonify({"status": "unknown"}), 503
+    return jsonify(resp)
 
 @app.route("/download/<filename>")
 def download_file(filename: str):
@@ -209,13 +204,6 @@ def download_file(filename: str):
         return "File not found", 404
 
     return send_file(path, as_attachment=True)
-
-# @app.route("/analytics", methods=["GET"])
-# def analytics():
-#     if not os.path.exists(DOWNLOAD_LOG_FILE):
-#         return jsonify({})
-#     with open(DOWNLOAD_LOG_FILE, "r") as f:
-#         return jsonify(json.load(f))
 
 # ─── Error Handlers ───────────────────────────────────────────────────────────
 
