@@ -5,4 +5,25 @@ services:
     plan: free
     region: oregon
     autoDeploy: true
-    startCommand: gunicorn app:app
+    startCommand: gunicorn app:app --bind 0.0.0.0:5000
+    envVars:
+      - key: REDIS_URL
+        value: redis://localhost:6379
+      - key: DATABASE_URL
+        fromService:
+          type: pserv
+          name: video-downloader-db
+          property: connectionString
+      - key: COOKIES_CONTENT
+        value: "# Add your cookies content here"
+
+  - type: pserv
+    name: video-downloader-db
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.postgres
+
+  - type: redis
+    name: video-downloader-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru

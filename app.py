@@ -206,6 +206,15 @@ def download_file(filename: str):
         return "File not found", 404
     return send_file(path, as_attachment=True)
 
+@app.route("/health")
+def health_check():
+    return jsonify({
+        "status": "ok",
+        "yt_dlp_available": os.path.exists("/usr/local/bin/yt-dlp"),
+        "cookies_exists": os.path.exists(COOKIES_FILE),
+        "redis_connected": redis_client.ping() if redis_client else False
+    })
+
 # ─── Error Handlers ───────────────────────────────────────────────────────────
 
 @app.errorhandler(404)

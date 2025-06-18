@@ -5,9 +5,15 @@ FROM python:3.10-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y ffmpeg curl && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+# Install system dependencies including yt-dlp
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    curl \
+    wget \
+    && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp \
+    && chmod a+rx /usr/local/bin/yt-dlp \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create working directory
 WORKDIR /app
@@ -23,5 +29,4 @@ RUN pip install -r requirements.txt
 EXPOSE 5000
 
 # Start app
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000"]
-
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--workers", "2"]
