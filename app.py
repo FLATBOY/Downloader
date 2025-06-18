@@ -5,6 +5,7 @@ import logging
 import threading
 import subprocess
 import json
+import redis
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from flask import Flask, request, render_template, send_file, jsonify
@@ -24,6 +25,10 @@ SUPPORTED_FORMATS = ["mp4", "mp3"]
 app = Flask(__name__, template_folder=TEMPLATES_FOLDER)
 user_sessions: Dict[str, datetime] = {}
 download_status: Dict[str, Any] = {}
+
+# ─── Redis Setup ───────────────────────────────────────────────────────────────
+redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+redis_client = redis.Redis.from_url(redis_url)
 
 # ─── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -157,11 +162,11 @@ def start_download():
 
 @app.route("/status/<file_id>")
 def status(file_id: str):
-    status = download_status.get(file_id)
-    if not status:
+    data = redis_client.get(f"status:{file_id}")
+    if not data:
         return jsonify({"status": "unknown"}), 404
-
-    resp = {"status": status["status"]}
+        
+    status = json.loads(data)
 
     if status["status"] == "done":
         filename = status.get("file")
