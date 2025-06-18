@@ -112,7 +112,10 @@ def run_download(url: str, format_type: str, file_id: str) -> None:
 
         download_status[file_id] = {"status": "downloading", "started_at": datetime.now()}
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        logger.info(f"yt-dlp output: {result.stdout}")
+        # logger.info(f"yt-dlp output: {result.stdout}")
+        logger.error(f"yt-dlp stdout: {result.stdout}")
+        logger.error(f"yt-dlp stderr: {result.stderr}")
+        result.check_returncode()
 
         files = sorted(glob.glob(os.path.join(DOWNLOAD_FOLDER, f"{short_id}-*.*")), key=os.path.getmtime, reverse=True)
         if files:
