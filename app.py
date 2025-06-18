@@ -9,7 +9,7 @@ import redis
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from flask import Flask, request, render_template, send_file, jsonify
-from tracking import log_download_to_db  # PostgreSQL logger
+from tracking import log_download_to_db  # Your PostgreSQL logger
 
 # ─── Configuration ─────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -20,7 +20,7 @@ MAX_FILE_SIZE = "1024M"
 CLEANUP_INTERVAL_HOURS = 24
 SUPPORTED_FORMATS = ["mp4", "mp3"]
 
-# ─── Flask Setup ──────────────────────────────────────────────────────────────
+# ─── App Setup ─────────────────────────────────────────────────────────────────
 app = Flask(__name__, template_folder=TEMPLATES_FOLDER)
 user_sessions: Dict[str, datetime] = {}
 
@@ -28,7 +28,7 @@ user_sessions: Dict[str, datetime] = {}
 redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 redis_client = redis.Redis.from_url(redis_url)
 
-# ─── Logging Setup ─────────────────────────────────────────────────────────────
+# ─── Logging ───────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 # ─── Directory Setup ───────────────────────────────────────────────────────────
 os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
-# ─── Cookies ───────────────────────────────────────────────────────────────────
+# ─── Cookie Setup ──────────────────────────────────────────────────────────────
 cookies_env = os.getenv("COOKIES_CONTENT")
 cookies_path = os.path.join(BASE_DIR, "cookies.txt")
 if cookies_env and not os.path.exists(cookies_path):
@@ -50,7 +50,7 @@ COOKIES_FILE = cookies_path
 # ─── Utility Functions ─────────────────────────────────────────────────────────
 
 def validate_url(url: str) -> bool:
-    return isinstance(url, str) and url.startswith(("http://", "https://"))
+    return isinstance(url, str) and url.startswith(('http://', 'https://'))
 
 def validate_format(format_type: str) -> bool:
     return format_type in SUPPORTED_FORMATS
@@ -63,72 +63,64 @@ def cleanup_old_files():
             logger.info(f"Removed old file: {file_path}")
 
 def log_download(title: str, filename: str, ip: str):
-    log_data = {}
-    if os.path.exists(DOWNLOAD_LOG_FILE):
-        try:
+    try:
+        log_data = {}
+        if os.path.exists(DOWNLOAD_LOG_FILE):
             with open(DOWNLOAD_LOG_FILE, "r") as f:
                 log_data = json.load(f)
-        except Exception:
-            pass
-    log_data[filename] = log_data.get(filename, 0) + 1
-    with open(DOWNLOAD_LOG_FILE, "w") as f:
-        json.dump(log_data, f, indent=2)
-    logger.info(f"Local log: {filename} by {ip}")
+        log_data[filename] = log_data.get(filename, 0) + 1
+        with open(DOWNLOAD_LOG_FILE, "w") as f:
+            json.dump(log_data, f, indent=2)
+        logger.info(f"Local log: {filename} by {ip}")
+    except Exception as e:
+        logger.warning(f"Logging error: {e}")
 
-# ─── Core Download Logic ───────────────────────────────────────────────────────
+# ─── Download Logic ────────────────────────────────────────────────────────────
 
 def run_download(url: str, format_type: str, file_id: str):
     try:
         short_id = uuid.uuid4().hex[:8]
-        logger.info(f"Start download {file_id}: {url} as {format_type}")
+        logger.info(f"Started download for {file_id} - URL: {url}")
         user_sessions[file_id] = datetime.now()
 
         output_template = os.path.join(DOWNLOAD_FOLDER, f"{short_id}-%(title).200s.%(ext)s")
 
-        is_tiktokcdn = "tiktokcdn" in url or "v16-webapp" in url
-        is_tiktok = "tiktok.com" in url and not is_tiktokcdn
-        is_youtube = "youtube.com" in url or "youtu.be" in url
+        is_tiktok = "tiktok.com" in url
         is_facebook = "facebook.com" in url or "fb.watch" in url
+        is_youtube = "youtube.com" in url or "youtu.be" in url
 
-        if is_tiktokcdn:
-            wget_path = output_template.replace("%(title).200s.%(ext)s", "tiktok.mp4")
-            cmd = ["wget", "-O", wget_path, url]
+        base_cmd = [
+            "yt-dlp",
+            "--cookies", COOKIES_FILE,
+            "--max-filesize", MAX_FILE_SIZE,
+            "--no-playlist",
+            "-o", output_template
+        ]
+
+        if format_type == "mp4":
+            format_flag = "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]" if is_youtube else "bestvideo+bestaudio/best"
+            cmd = base_cmd + ["-f", format_flag, "--merge-output-format", "mp4", url]
+        elif format_type == "mp3":
+            cmd = base_cmd + ["-x", "--audio-format", "mp3", url]
         else:
-            base_cmd = [
-                "yt-dlp", "--cookies", COOKIES_FILE,
-                "--max-filesize", MAX_FILE_SIZE,
-                "--no-playlist",
-                "-o", output_template
-            ]
-
-            if format_type == "mp4":
-                cmd = base_cmd + [
-                    "-f",
-                    "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]" if is_youtube or is_tiktok else "bestvideo+bestaudio/best",
-                    "--merge-output-format", "mp4",
-                    url
-                ]
-            elif format_type == "mp3":
-                cmd = base_cmd + ["-x", "--audio-format", "mp3", url]
-            else:
-                raise ValueError("Unsupported format")
+            raise ValueError("Unsupported format")
 
         redis_client.set(f"status:{file_id}", json.dumps({"status": "downloading"}))
 
         result = subprocess.run(cmd, capture_output=True, text=True)
-        logger.error(f"stdout: {result.stdout}")
-        logger.error(f"stderr: {result.stderr}")
+        logger.info(f"yt-dlp stdout: {result.stdout}")
+        logger.error(f"yt-dlp stderr: {result.stderr}")
         result.check_returncode()
 
         files = sorted(glob.glob(os.path.join(DOWNLOAD_FOLDER, f"{short_id}-*.*")), key=os.path.getmtime, reverse=True)
         if not files:
-            raise FileNotFoundError("No file downloaded")
+            raise FileNotFoundError("No file was downloaded.")
 
         filename = os.path.basename(files[0])
         original_path = os.path.join(DOWNLOAD_FOLDER, filename)
 
-        # 🔧 Post-process Facebook video to re-encode for QuickTime compatibility
         if is_facebook and filename.endswith(".mp4"):
+            # QuickTime fix
             converted_path = os.path.join(DOWNLOAD_FOLDER, f"{short_id}-converted.mp4")
             subprocess.run([
                 "ffmpeg", "-i", original_path,
@@ -152,7 +144,8 @@ def run_download(url: str, format_type: str, file_id: str):
             "error": str(e),
             "completed_at": datetime.now().isoformat()
         }))
-# ─── Routes ────────────────────────────────────────────────────────────────────
+
+# ─── Flask Routes ──────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
@@ -206,12 +199,14 @@ def status(file_id: str):
 
 @app.route("/download/<filename>")
 def download_file(filename: str):
-    if not filename or ".." in filename or "/" in filename:
+    if ".." in filename or "/" in filename:
         return "Invalid filename", 400
     path = os.path.join(DOWNLOAD_FOLDER, filename)
     if not os.path.exists(path):
         return "File not found", 404
     return send_file(path, as_attachment=True)
+
+# ─── Error Handlers ───────────────────────────────────────────────────────────
 
 @app.errorhandler(404)
 def not_found(_):
@@ -219,10 +214,11 @@ def not_found(_):
 
 @app.errorhandler(500)
 def server_error(e):
-    logger.error(f"Internal server error: {e}")
-    return jsonify({"error": "Internal error"}), 500
+    logger.error(f"Internal error: {e}")
+    return jsonify({"error": "Internal server error"}), 500
 
-# ─── Run Server ────────────────────────────────────────────────────────────────
+# ─── Run ───────────────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
-    logger.info("🚀 Starting Flask Video Downloader")
+    logger.info("🚀 Flask Video Downloader is starting")
     app.run(debug=True, host="0.0.0.0", port=5000)
