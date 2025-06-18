@@ -9,7 +9,7 @@ import redis
 from datetime import datetime, timedelta
 from typing import Dict, Any
 from flask import Flask, request, render_template, send_file, jsonify
-from tracking import log_download_to_db  # Your PostgreSQL logger
+from tracking import log_download_to_db 
 
 # ─── Configuration ─────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -119,7 +119,7 @@ def run_download(url: str, format_type: str, file_id: str):
         filename = os.path.basename(files[0])
         original_path = os.path.join(DOWNLOAD_FOLDER, filename)
 
-        if is_facebook and filename.endswith(".mp4"):
+        if is_facebook:
             # QuickTime fix
             converted_path = os.path.join(DOWNLOAD_FOLDER, f"{short_id}-converted.mp4")
             subprocess.run([
@@ -206,14 +206,22 @@ def download_file(filename: str):
         return "File not found", 404
     return send_file(path, as_attachment=True)
 
-@app.route("/health")
-def health_check():
-    return jsonify({
-        "status": "ok",
-        "yt_dlp_available": os.path.exists("/usr/local/bin/yt-dlp"),
-        "cookies_exists": os.path.exists(COOKIES_FILE),
-        "redis_connected": redis_client.ping() if redis_client else False
-    })
+@app.route("/test-ytdlp")
+def test_ytdlp():
+    try:
+        result = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True)
+        return jsonify({
+            "yt_dlp_installed": True,
+            "version": result.stdout.strip(),
+            "cookies_exists": os.path.exists(COOKIES_FILE)
+        })
+    except Exception as e:
+        return jsonify({
+            "yt_dlp_installed": False,
+            "error": str(e),
+            "cookies_exists": os.path.exists(COOKIES_FILE)
+        })
+
 
 # ─── Error Handlers ───────────────────────────────────────────────────────────
 

@@ -8,22 +8,14 @@ services:
     startCommand: gunicorn app:app --bind 0.0.0.0:5000
     envVars:
       - key: REDIS_URL
-        value: redis://localhost:6379
-      - key: DATABASE_URL
         fromService:
-          type: pserv
-          name: video-downloader-db
+          type: redis  
+          name: video_downloader_redis
           property: connectionString
       - key: COOKIES_CONTENT
-        value: "# Add your cookies content here"
-
-  - type: pserv
-    name: video-downloader-db
-    env: docker
-    plan: free
-    dockerfilePath: ./Dockerfile.postgres
+        value: "# Netscape HTTP Cookie File\n# Add your actual cookies here"
 
   - type: redis
-    name: video-downloader-redis
+    name: video_downloader_redis
     plan: free
     maxmemoryPolicy: allkeys-lru
