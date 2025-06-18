@@ -88,6 +88,7 @@ def run_download(url: str, format_type: str, file_id: str):
         is_tiktokcdn = "tiktokcdn" in url or "v16-webapp" in url
         is_tiktok = "tiktok.com" in url and not is_tiktokcdn
         is_youtube = "youtube.com" in url or "youtu.be" in url
+        is_facebook = "facebook.com" in url or "fb.watch" in url
 
         if is_tiktokcdn:
             wget_path = output_template.replace("%(title).200s.%(ext)s", "tiktok.mp4")
@@ -99,6 +100,7 @@ def run_download(url: str, format_type: str, file_id: str):
                 "--no-playlist",
                 "-o", output_template
             ]
+
             if format_type == "mp4":
                 cmd = base_cmd + [
                     "-f",
@@ -123,6 +125,19 @@ def run_download(url: str, format_type: str, file_id: str):
             raise FileNotFoundError("No file downloaded")
 
         filename = os.path.basename(files[0])
+        original_path = os.path.join(DOWNLOAD_FOLDER, filename)
+
+        # 🔧 Post-process Facebook video to re-encode for QuickTime compatibility
+        if is_facebook and filename.endswith(".mp4"):
+            converted_path = os.path.join(DOWNLOAD_FOLDER, f"{short_id}-converted.mp4")
+            subprocess.run([
+                "ffmpeg", "-i", original_path,
+                "-c:v", "libx264", "-c:a", "aac",
+                "-movflags", "+faststart", "-y", converted_path
+            ], check=True)
+            os.remove(original_path)
+            filename = os.path.basename(converted_path)
+
         status = {
             "status": "done",
             "file": filename,
@@ -137,7 +152,6 @@ def run_download(url: str, format_type: str, file_id: str):
             "error": str(e),
             "completed_at": datetime.now().isoformat()
         }))
-
 # ─── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
